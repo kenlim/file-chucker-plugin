@@ -4,7 +4,6 @@ import {
 	MarkdownView,
 	SuggestModal,
 	TFile,
-	Notice,
 	Plugin,
 	PluginSettingTab,
 	Setting,
@@ -12,36 +11,32 @@ import {
 } from "obsidian";
 
 // Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+interface PluginSettings {
+	openNextFileInFolder: boolean;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: "default",
+const DEFAULT_SETTINGS: PluginSettings = {
+	openNextFileInFolder: false,
 };
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class BetterMoverPlugin extends Plugin {
+	settings: PluginSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This adds an editor command that can perform some operation on the current editor instance
-		// Todo: EditorCallbacks only work if there is a file selected
+		// Commands with editorCallbacks only work if there is a file open. 
 		this.addCommand({
 			id: "move-to-new-or-existing-folder",
 			name: "Move to new or existing folder",
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				new Notice("Hello from 'move to new or existing folder'");
 				const currentFile = view.file;
-				new Notice("open: " + currentFile.path);
-				new TargetFolderModal(this.app).open();
+				new TargetFolderModal(this.app, currentFile).open();
 			},
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new MoveToNewOrExistingFolderSettingsTab(this.app, this));
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
@@ -71,31 +66,54 @@ export default class MyPlugin extends Plugin {
 }
 
 export class TargetFolderModal extends SuggestModal<TFolder> {
-	
-	markdownFiles: TFile[]; 
-	folders: TFolder[];
+	allMarkdownFiles: TFile[];
+	allFolders: TFolder[];
+	createFolder = false;
 
-	constructor(app: App) {
+	constructor(app: App, currentFile: TFile) {
 		super(app);
-		this.markdownFiles = app.vault.getMarkdownFiles();
-		this.folders = this.markdownFiles.map(file => file.parent).unique()
+		this.allMarkdownFiles = app.vault.getMarkdownFiles();
+		this.allFolders = this.allMarkdownFiles.map((file) => file.parent).unique();
 
-		console.log(this.modalEl)
-		// add tab detection
-		this.scope.register([], 'Tab', e => {
+		// add "Tab"-key listener
+		this.scope.register([], "Tab", (e) => {
 			e.preventDefault();
-			this.inputEl.value = this.modalEl.getElementsByClassName("is-selected")[0].getText()
-		})
+			this.tabCompleteEntryFieldToSelection();
+		});
 	}
 
-	
+	private tabCompleteEntryFieldToSelection() {
+		const selectedItem = this.modalEl
+			.getElementsByClassName("is-selected");
+		this.inputEl.value = selectedItem.length > 0 ? selectedItem[0].getText() : "";
+	}
 
-	// Returns all available suggestions.
+	// list suggestions against the query
 	getSuggestions(query: string): TFolder[] {
-		return this.folders
-			.filter((file) =>
-				file.path.toLowerCase().includes(query.toLowerCase())
-			);
+		// since a new query was entered, reset the createFolder flag.
+		if (this.createFolder) {
+			this.createFolder = false;
+		}
+
+		return this.allFolders.filter((file) =>
+			file.path.toLowerCase().includes(query.toLowerCase())
+		);
+	}
+
+	// override original "no match" behaviour
+	onNoSuggestion(): void {
+		// prop up the flag
+		this.createFolder = true;
+
+		const resultsBlock = this.modalEl.getElementsByClassName("prompt-results");
+		if (resultsBlock.length > 0) {
+			const resultBox = resultsBlock[0];
+			resultBox.empty();
+			resultBox.createEl("div", {
+				text: "Create folder and move",
+				cls: "suggestion-empty",
+			});
+		}
 	}
 
 	// Renders each suggestion item.
@@ -103,22 +121,28 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 		el.createEl("div", { text: folder.path });
 	}
 
-	selectSuggestion(folder: TFolder, evt: MouseEvent | KeyboardEvent): void {	
-		new Notice("selectSuggestion");
-		// This is how you set the value of the input
-		this.inputEl.value = (folder.path)
+	selectSuggestion(folder: TFolder, evt: MouseEvent | KeyboardEvent): void {
+		if (this.createFolder) {
+			// We will need to create the new folder first
+			const newFolderName = this.inputEl.value;
+			console.log("Create new folder: " + newFolderName);
+			console.log("Then move the file to " + newFolderName);
+		} else {
+			console.log("Move file to: " + folder.path);
+		}
+		this.close();
 	}
 
-	onChooseSuggestion(item: TFolder, evt: MouseEvent | KeyboardEvent): void {
-		new Notice("onChooseSuggestion");
-		this.setPlaceholder(item.path);
+	// not sure what this is for because I can't trigger it.
+	onChooseSuggestion(item: TFolder, evt: MouseEvent | KeyboardEvent):void {
+		throw new Error("Method not implemented.");
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class MoveToNewOrExistingFolderSettingsTab extends PluginSettingTab {
+	plugin: BetterMoverPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: BetterMoverPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -133,17 +157,15 @@ class SampleSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(containerEl)
-			.setName("Setting #1")
-			.setDesc("It's a secret")
-			.addText((text) =>
-				text
-					.setPlaceholder("Enter your secret")
-					.setValue(this.plugin.settings.mySetting)
-					.onChange(async (value) => {
-						console.log("Secret: " + value);
-						this.plugin.settings.mySetting = value;
-						await this.plugin.saveSettings();
-					})
-			);
+			.setName("Automatically proceed to the next file")
+			.setDesc("Allows you to process a folder like an Inbox quickly.")
+			.addToggle((setting) => {
+				setting
+				.setValue(this.plugin.settings.openNextFileInFolder)
+				.onChange(async (value) => {
+					this.plugin.settings.openNextFileInFolder = value;
+					await this.plugin.saveSettings();
+				})
+			});
 	}
 }
