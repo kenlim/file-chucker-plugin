@@ -1,11 +1,10 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
+	"id": "obsidian-move-to-new-or-existing-folder",
+	"name": "Move to New or Existing Folder",
+	"version": "0.0.1",
 	"minAppVersion": "0.15.0",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "Plugin that allows you to move a file to a new or existing folder.",
+	"author": "Ken Lim",
+	"authorUrl": "https://github.com/kenlim/obsidian-move-to-new-or-existing-folder",
 	"isDesktopOnly": false
 }
