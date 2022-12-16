@@ -79,7 +79,16 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 		super(app);
 		this.markdownFiles = app.vault.getMarkdownFiles();
 		this.folders = this.markdownFiles.map(file => file.parent).unique()
+
+		console.log(this.modalEl)
+		// add tab detection
+		this.scope.register([], 'Tab', e => {
+			e.preventDefault();
+			this.inputEl.value = this.modalEl.getElementsByClassName("is-selected")[0].getText()
+		})
 	}
+
+	
 
 	// Returns all available suggestions.
 	getSuggestions(query: string): TFolder[] {
@@ -90,16 +99,17 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 	}
 
 	// Renders each suggestion item.
-	renderSuggestion(folder: TFolder, el: HTMLElement) {
+	renderSuggestion(folder: TFolder, el: HTMLElement): void {
 		el.createEl("div", { text: folder.path });
 	}
 
 	selectSuggestion(folder: TFolder, evt: MouseEvent | KeyboardEvent): void {	
 		new Notice("selectSuggestion");
-		this.setPlaceholder(folder.path);
+		// This is how you set the value of the input
+		this.inputEl.value = (folder.path)
 	}
 
-	onChooseSuggestion(item: TFolder, evt: MouseEvent | KeyboardEvent) {
+	onChooseSuggestion(item: TFolder, evt: MouseEvent | KeyboardEvent): void {
 		new Notice("onChooseSuggestion");
 		this.setPlaceholder(item.path);
 	}
