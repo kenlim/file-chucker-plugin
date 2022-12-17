@@ -8,7 +8,6 @@ import {
 	PluginSettingTab,
 	Setting,
 	TFolder,
-	FileManager,
 	Vault,
 } from "obsidian";
 
