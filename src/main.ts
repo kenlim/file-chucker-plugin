@@ -8,6 +8,8 @@ import {
 	PluginSettingTab,
 	Setting,
 	TFolder,
+	FileManager,
+	Vault,
 } from "obsidian";
 
 // Remember to rename these classes and interfaces!
@@ -66,26 +68,32 @@ export default class BetterMoverPlugin extends Plugin {
 }
 
 export class TargetFolderModal extends SuggestModal<TFolder> {
-	allMarkdownFiles: TFile[];
-	allFolders: TFolder[];
 	createFolder = false;
+	currentFile: TFile;
+	currentFilePath: string;
+	vault: Vault;
 
 	constructor(app: App, currentFile: TFile) {
 		super(app);
-		this.allMarkdownFiles = app.vault.getMarkdownFiles();
-		this.allFolders = this.allMarkdownFiles.map((file) => file.parent).unique();
+		this.vault = app.vault;
+		this.currentFile = currentFile;
+		this.currentFilePath = this.vault.getResourcePath(this.currentFile);
 
 		// add "Tab"-key listener
 		this.scope.register([], "Tab", (e) => {
 			e.preventDefault();
-			this.tabCompleteEntryFieldToSelection();
+			this.setSelectedEntryToTextEntryField();
 		});
 	}
 
-	private tabCompleteEntryFieldToSelection() {
+	private setSelectedEntryToTextEntryField() {
+		this.inputEl.value = this.getSelectedEntryPath();
+	}
+
+	private getSelectedEntryPath() {
 		const selectedItem = this.modalEl
 			.getElementsByClassName("is-selected");
-		this.inputEl.value = selectedItem.length > 0 ? selectedItem[0].getText() : "";
+		return selectedItem.length > 0 ? selectedItem[0].getText() : "";
 	}
 
 	// list suggestions against the query
@@ -95,7 +103,10 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 			this.createFolder = false;
 		}
 
-		return this.allFolders.filter((file) =>
+		const allMarkdownFiles = this.vault.getMarkdownFiles();
+		const allFolders = allMarkdownFiles.map((file) => file.parent).unique();
+
+		return allFolders.filter((file) =>
 			file.path.toLowerCase().includes(query.toLowerCase())
 		);
 	}
@@ -125,10 +136,14 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 		if (this.createFolder) {
 			// We will need to create the new folder first
 			const newFolderName = this.inputEl.value;
+			const targetPath = newFolderName + "/" + this.currentFile.name;
 			console.log("Create new folder: " + newFolderName);
-			console.log("Then move the file to " + newFolderName);
+			console.log("Then move the file to " + targetPath);
+			app.fileManager.renameFile(this.currentFile, targetPath)
 		} else {
-			console.log("Move file to: " + folder.path);
+			const targetPath = folder.path + "/" + this.currentFile.name;
+			console.log("Move file to: " + targetPath);
+			app.fileManager.renameFile(this.currentFile, targetPath)
 		}
 		this.close();
 	}
