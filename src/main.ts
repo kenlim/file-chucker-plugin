@@ -136,14 +136,20 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 		if (this.createFolder) {
 			// We will need to create the new folder first
 			const newFolderName = this.inputEl.value;
-			const targetPath = newFolderName + "/" + this.currentFile.name;
-			console.log("Create new folder: " + newFolderName);
-			console.log("Then move the file to " + targetPath);
-			app.fileManager.renameFile(this.currentFile, targetPath)
+			(async (newFolderName) => {
+				await app.vault.createFolder(newFolderName);
+				console.log("Created new folder: " + newFolderName);
+				const targetPath = newFolderName + "/" + this.currentFile.name;
+				await app.fileManager.renameFile(this.currentFile, targetPath)
+				console.log("Moved the file to " + targetPath);
+			})(newFolderName)
 		} else {
 			const targetPath = folder.path + "/" + this.currentFile.name;
-			console.log("Move file to: " + targetPath);
-			app.fileManager.renameFile(this.currentFile, targetPath)
+			(async (file, targetPath) => {
+				await app.fileManager.renameFile(file, targetPath)
+				console.log("Moved file to: " + targetPath);
+			})(this.currentFile, targetPath)
+			
 		}
 		this.close();
 	}
