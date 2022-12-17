@@ -76,6 +76,7 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 		super(app);
 		this.vault = app.vault;
 		this.currentFile = currentFile;
+		this.currentFolder = currentFile.parent;
 		this.currentFilePath = this.vault.getResourcePath(this.currentFile);
 
 		// add "Tab"-key listener
@@ -132,6 +133,7 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 	}
 
 	selectSuggestion(folder: TFolder, evt: MouseEvent | KeyboardEvent): void {
+		const originalFolder = this.currentFile.parent
 		if (this.createFolder) {
 			// We will need to create the new folder first
 			const newFolderName = this.inputEl.value;
@@ -150,6 +152,11 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 			})(this.currentFile, targetPath)
 			
 		}
+
+		// find the next file to open in the folder. 
+		const nextFile = originalFolder.children.find(fileOrFolder => fileOrFolder instanceof TFile)
+		const newLeaf = app.workspace.getLeaf();
+		newLeaf.openFile(nextFile)
 		this.close();
 	}
 
