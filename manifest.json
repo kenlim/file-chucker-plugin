@@ -1,9 +1,9 @@
 {
-	"id": "obsidian-move-to-new-or-existing-folder",
-	"name": "Move to New or Existing Folder",
+	"id": "obsidian-file-chucker",
+	"name": "File Chucker",
 	"version": "0.0.1",
 	"minAppVersion": "0.15.0",
-	"description": "Plugin that allows you to move a file to a new or existing folder.",
+	"description": "Quickly move a file to a new or existing folder, then open the next file.",
 	"author": "Ken Lim",
 	"authorUrl": "https://github.com/kenlim/obsidian-move-to-new-or-existing-folder",
 	"isDesktopOnly": false

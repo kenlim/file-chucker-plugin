@@ -16,10 +16,12 @@ import {
 // Remember to rename these classes and interfaces!
 interface FileChuckerPluginSettings {
 	proceedToNextFileInFolder: boolean;
+	debugMode: boolean;
 }
 
 const DEFAULT_SETTINGS: FileChuckerPluginSettings = {
 	proceedToNextFileInFolder: false,
+	debugMode: false
 };
 
 export default class FileChuckerPlugin extends Plugin {
@@ -34,7 +36,7 @@ export default class FileChuckerPlugin extends Plugin {
 			name: "Move to new or existing folder",
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				const currentFile = view.file;
-				new FileChuckerModal(this.app, currentFile, this.settings.proceedToNextFileInFolder).open();
+				new FileChuckerModal(this.app, currentFile, this.settings).open();
 			},
 		});
 
@@ -62,15 +64,15 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 	showingNoSuggestions = false;
 	currentFile: TFile;
 	currentFilePath: string;
-	autoProceedToNextFile: boolean;
+	settings: FileChuckerPluginSettings;
 	vault: Vault;
 	inputListener: EventListener;
 
-	constructor(app: App, currentFile: TFile, proceedToNextFile: boolean) {
+	constructor(app: App, currentFile: TFile, settings: FileChuckerPluginSettings) {
 		super(app);
 		this.vault = app.vault;
 		this.currentFile = currentFile;
-		this.autoProceedToNextFile = proceedToNextFile;
+		this.settings = settings;
 		this.currentFilePath = this.vault.getResourcePath(this.currentFile);
 		this.inputListener = this.listenInput.bind(this);
 	}
@@ -145,25 +147,38 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 		(async () => {
 			const targetFolder = await app.vault.getAbstractFileByPath(specifiedFolderPath);
 			if (targetFolder === null) {
-				console.log(`${specifiedFolderPath} does not exist. Creating now...`);
+				if (this.settings.debugMode) {
+					console.log(`${specifiedFolderPath} does not exist. Creating now...`);
+				}  
 				await app.vault.createFolder(specifiedFolderPath);
 			}
 			const newFilePath = specifiedFolderPath + "/" + this.currentFile.name;
-			console.log(`Moving ${this.currentFile.path} to ${newFilePath}`);
+			if (this.settings.debugMode) {
+				console.log(`Moving ${this.currentFile.path} to ${newFilePath}`);
+			}
 			await app.fileManager.renameFile(this.currentFile, newFilePath)
-			
-			if (this.autoProceedToNextFile) {
+			if (this.settings.proceedToNextFileInFolder) {
+				
 				const isAFile = (thing: TAbstractFile): thing is TFile => {
 					return thing instanceof TFile;
 				};
-
+				if (this.settings.debugMode) {
+					console.log(`Auto-proceeding to the next file.`);
+				}
+				
 				const nextFile : TFile[] = originalFolder.children.filter(isAFile)
 				
 				if (nextFile.length > 0) {
 					const newLeaf = app.workspace.getLeaf();
 					const toOpen = nextFile[0];
+					if (this.settings.debugMode) {
+						console.log(`Opening ${toOpen.path}`);
+					}
 					await newLeaf.openFile(toOpen)
 				} else {
+					if (this.settings.debugMode) {
+						console.log(`Nothing to open. Folder is now empty.`);
+					}
 					new Notice("Folder now empty.")
 				}
 			}
@@ -203,6 +218,18 @@ class MoveToNewOrExistingFolderSettingsTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.proceedToNextFileInFolder)
 				.onChange(async (value) => {
 					this.plugin.settings.proceedToNextFileInFolder = value;
+					await this.plugin.saveSettings();
+				})
+			});
+		
+		new Setting(containerEl)
+			.setName("Enable debug mode")
+			.setDesc("Prints out message in the Console to help diagnose issues with this plugin.")
+			.addToggle((setting) => {
+				setting
+				.setValue(this.plugin.settings.debugMode)
+				.onChange(async (value) => {
+					this.plugin.settings.debugMode = value;
 					await this.plugin.saveSettings();
 				})
 			});
