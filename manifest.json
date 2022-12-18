@@ -5,6 +5,6 @@
 	"minAppVersion": "0.15.0",
 	"description": "Quickly move a file to a new or existing folder, then open the next file.",
 	"author": "Ken Lim",
-	"authorUrl": "https://github.com/kenlim/obsidian-move-to-new-or-existing-folder",
+	"authorUrl": "https://github.com/kenlim/obsidian-file-chucker",
 	"isDesktopOnly": false
 }
