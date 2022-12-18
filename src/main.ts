@@ -21,7 +21,7 @@ interface FileChuckerPluginSettings {
 
 const DEFAULT_SETTINGS: FileChuckerPluginSettings = {
 	proceedToNextFileInFolder: false,
-	debugMode: false
+	debugMode: false,
 };
 
 export default class FileChuckerPlugin extends Plugin {
@@ -30,19 +30,22 @@ export default class FileChuckerPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// Commands with editorCallbacks only work if there is a file open. 
+		// Commands with editorCallbacks only work if there is a file open.
 		this.addCommand({
 			id: "move-to-new-or-existing-folder",
 			name: "Move to new or existing folder",
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				const currentFile = view.file;
-				new FileChuckerModal(this.app, currentFile, this.settings).open();
+				new FileChuckerModal(
+					this.app,
+					currentFile,
+					this.settings
+				).open();
 			},
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FileChuckerSettingsTab(this.app, this));
-
 	}
 
 	onunload() {}
@@ -68,7 +71,11 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 	vault: Vault;
 	inputListener: EventListener;
 
-	constructor(app: App, currentFile: TFile, settings: FileChuckerPluginSettings) {
+	constructor(
+		app: App,
+		currentFile: TFile,
+		settings: FileChuckerPluginSettings
+	) {
 		super(app);
 		this.vault = app.vault;
 		this.currentFile = currentFile;
@@ -78,18 +85,18 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 	}
 
 	onOpen() {
-        this.inputEl.addEventListener("keydown", this.inputListener);
+		this.inputEl.addEventListener("keydown", this.inputListener);
 		super.onOpen();
-    }
+	}
 
-    onClose() {
-        this.inputEl.removeEventListener("keydown", this.inputListener);
-    }
-	
+	onClose() {
+		this.inputEl.removeEventListener("keydown", this.inputListener);
+	}
+
 	listenInput(evt: KeyboardEvent) {
 		if (evt.key === "Tab") {
 			this.setSelectedEntryToTextEntryField();
-        }
+		}
 	}
 
 	private setSelectedEntryToTextEntryField() {
@@ -97,8 +104,7 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 	}
 
 	private getSelectedEntryPath() {
-		const selectedItem = this.modalEl
-			.getElementsByClassName("is-selected");
+		const selectedItem = this.modalEl.getElementsByClassName("is-selected");
 		return selectedItem.length > 0 ? selectedItem[0].getText() : "";
 	}
 
@@ -122,7 +128,8 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 		// prop up the flag
 		this.showingNoSuggestions = true;
 
-		const resultsBlock = this.modalEl.getElementsByClassName("prompt-results");
+		const resultsBlock =
+			this.modalEl.getElementsByClassName("prompt-results");
 		if (resultsBlock.length > 0) {
 			const resultBox = resultsBlock[0];
 			resultBox.empty();
@@ -141,54 +148,63 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 	selectSuggestion(folder: TFolder, evt: MouseEvent | KeyboardEvent): void {
 		const originalFolder = this.currentFile.parent;
 
-		const specifiedFolderPath = this.showingNoSuggestions ? this.inputEl.value : folder.path;
+		const specifiedFolderPath = this.showingNoSuggestions
+			? this.inputEl.value
+			: folder.path;
 
 		// Make sure the selected folder exists
 		(async () => {
-			const targetFolder = await app.vault.getAbstractFileByPath(specifiedFolderPath);
+			const targetFolder = await app.vault.getAbstractFileByPath(
+				specifiedFolderPath
+			);
 			if (targetFolder === null) {
 				if (this.settings.debugMode) {
-					console.log(`${specifiedFolderPath} does not exist. Creating now...`);
-				}  
+					console.log(
+						`${specifiedFolderPath} does not exist. Creating now...`
+					);
+				}
 				await app.vault.createFolder(specifiedFolderPath);
 			}
-			const newFilePath = specifiedFolderPath + "/" + this.currentFile.name;
+			const newFilePath =
+				specifiedFolderPath + "/" + this.currentFile.name;
 			if (this.settings.debugMode) {
-				console.log(`Moving ${this.currentFile.path} to ${newFilePath}`);
+				console.log(
+					`Moving ${this.currentFile.path} to ${newFilePath}`
+				);
 			}
-			await app.fileManager.renameFile(this.currentFile, newFilePath)
+			await app.fileManager.renameFile(this.currentFile, newFilePath);
 			if (this.settings.proceedToNextFileInFolder) {
-				
 				const isAFile = (thing: TAbstractFile): thing is TFile => {
 					return thing instanceof TFile;
 				};
 				if (this.settings.debugMode) {
 					console.log(`Auto-proceeding to the next file.`);
 				}
-				
-				const nextFile : TFile[] = originalFolder.children.filter(isAFile)
-				
+
+				const nextFile: TFile[] =
+					originalFolder.children.filter(isAFile);
+
 				if (nextFile.length > 0) {
 					const newLeaf = app.workspace.getLeaf();
 					const toOpen = nextFile[0];
 					if (this.settings.debugMode) {
 						console.log(`Opening ${toOpen.path}`);
 					}
-					await newLeaf.openFile(toOpen)
+					await newLeaf.openFile(toOpen);
 				} else {
 					if (this.settings.debugMode) {
 						console.log(`Nothing to open. Folder is now empty.`);
 					}
-					new Notice("Folder now empty.")
+					new Notice("Folder now empty.");
 				}
 			}
-		})()
+		})();
 
 		this.close();
 	}
 
 	// not sure what this is for because I can't trigger it.
-	onChooseSuggestion(item: TFolder, evt: MouseEvent | KeyboardEvent):void {
+	onChooseSuggestion(item: TFolder, evt: MouseEvent | KeyboardEvent): void {
 		throw new Error("Method not implemented.");
 	}
 }
@@ -207,7 +223,7 @@ class FileChuckerSettingsTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl("h2", {
-			text: "Options for Move to New or Existing Folder",
+			text: "Options for File Chucker",
 		});
 
 		new Setting(containerEl)
@@ -215,23 +231,25 @@ class FileChuckerSettingsTab extends PluginSettingTab {
 			.setDesc("Allows you to process a folder like an Inbox quickly.")
 			.addToggle((setting) => {
 				setting
-				.setValue(this.plugin.settings.proceedToNextFileInFolder)
-				.onChange(async (value) => {
-					this.plugin.settings.proceedToNextFileInFolder = value;
-					await this.plugin.saveSettings();
-				})
+					.setValue(this.plugin.settings.proceedToNextFileInFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.proceedToNextFileInFolder = value;
+						await this.plugin.saveSettings();
+					});
 			});
-		
+
 		new Setting(containerEl)
 			.setName("Enable debug mode")
-			.setDesc("Prints out message in the Console to help diagnose issues with this plugin.")
+			.setDesc(
+				"Prints out message in the Console to help diagnose issues with this plugin."
+			)
 			.addToggle((setting) => {
 				setting
-				.setValue(this.plugin.settings.debugMode)
-				.onChange(async (value) => {
-					this.plugin.settings.debugMode = value;
-					await this.plugin.saveSettings();
-				})
+					.setValue(this.plugin.settings.debugMode)
+					.onChange(async (value) => {
+						this.plugin.settings.debugMode = value;
+						await this.plugin.saveSettings();
+					});
 			});
 	}
 }
