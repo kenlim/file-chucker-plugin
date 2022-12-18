@@ -9,19 +9,21 @@ import {
 	Setting,
 	TFolder,
 	Vault,
+	TAbstractFile,
+	Notice,
 } from "obsidian";
 
 // Remember to rename these classes and interfaces!
-interface PluginSettings {
-	openNextFileInFolder: boolean;
+interface FileChuckerPluginSettings {
+	proceedToNextFileInFolder: boolean;
 }
 
-const DEFAULT_SETTINGS: PluginSettings = {
-	openNextFileInFolder: false,
+const DEFAULT_SETTINGS: FileChuckerPluginSettings = {
+	proceedToNextFileInFolder: false,
 };
 
-export default class BetterMoverPlugin extends Plugin {
-	settings: PluginSettings;
+export default class FileChuckerPlugin extends Plugin {
+	settings: FileChuckerPluginSettings;
 
 	async onload() {
 		await this.loadSettings();
@@ -32,23 +34,13 @@ export default class BetterMoverPlugin extends Plugin {
 			name: "Move to new or existing folder",
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				const currentFile = view.file;
-				new TargetFolderModal(this.app, currentFile).open();
+				new FileChuckerModal(this.app, currentFile, this.settings.proceedToNextFileInFolder).open();
 			},
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new MoveToNewOrExistingFolderSettingsTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, "click", (evt: MouseEvent) => {
-			console.log("click", evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000)
-		);
 	}
 
 	onunload() {}
@@ -66,24 +58,36 @@ export default class BetterMoverPlugin extends Plugin {
 	}
 }
 
-export class TargetFolderModal extends SuggestModal<TFolder> {
-	createFolder = false;
+export class FileChuckerModal extends SuggestModal<TFolder> {
+	showingNoSuggestions = false;
 	currentFile: TFile;
 	currentFilePath: string;
+	autoProceedToNextFile: boolean;
 	vault: Vault;
+	inputListener: EventListener;
 
-	constructor(app: App, currentFile: TFile) {
+	constructor(app: App, currentFile: TFile, proceedToNextFile: boolean) {
 		super(app);
 		this.vault = app.vault;
 		this.currentFile = currentFile;
-		this.currentFolder = currentFile.parent;
+		this.autoProceedToNextFile = proceedToNextFile;
 		this.currentFilePath = this.vault.getResourcePath(this.currentFile);
+		this.inputListener = this.listenInput.bind(this);
+	}
 
-		// add "Tab"-key listener
-		this.scope.register([], "Tab", (e) => {
-			e.preventDefault();
+	onOpen() {
+        this.inputEl.addEventListener("keydown", this.inputListener);
+		super.onOpen();
+    }
+
+    onClose() {
+        this.inputEl.removeEventListener("keydown", this.inputListener);
+    }
+	
+	listenInput(evt: KeyboardEvent) {
+		if (evt.key === "Tab") {
 			this.setSelectedEntryToTextEntryField();
-		});
+        }
 	}
 
 	private setSelectedEntryToTextEntryField() {
@@ -99,8 +103,8 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 	// list suggestions against the query
 	getSuggestions(query: string): TFolder[] {
 		// since a new query was entered, reset the createFolder flag.
-		if (this.createFolder) {
-			this.createFolder = false;
+		if (this.showingNoSuggestions) {
+			this.showingNoSuggestions = false;
 		}
 
 		const allMarkdownFiles = this.vault.getMarkdownFiles();
@@ -114,14 +118,14 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 	// override original "no match" behaviour
 	onNoSuggestion(): void {
 		// prop up the flag
-		this.createFolder = true;
+		this.showingNoSuggestions = true;
 
 		const resultsBlock = this.modalEl.getElementsByClassName("prompt-results");
 		if (resultsBlock.length > 0) {
 			const resultBox = resultsBlock[0];
 			resultBox.empty();
 			resultBox.createEl("div", {
-				text: "Create folder and move",
+				text: "Create folder and move file to it",
 				cls: "suggestion-empty",
 			});
 		}
@@ -133,30 +137,38 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 	}
 
 	selectSuggestion(folder: TFolder, evt: MouseEvent | KeyboardEvent): void {
-		const originalFolder = this.currentFile.parent
-		if (this.createFolder) {
-			// We will need to create the new folder first
-			const newFolderName = this.inputEl.value;
-			(async (newFolderName) => {
-				await app.vault.createFolder(newFolderName);
-				console.log("Created new folder: " + newFolderName);
-				const targetPath = newFolderName + "/" + this.currentFile.name;
-				await app.fileManager.renameFile(this.currentFile, targetPath)
-				console.log("Moved the file to " + targetPath);
-			})(newFolderName)
-		} else {
-			const targetPath = folder.path + "/" + this.currentFile.name;
-			(async (file, targetPath) => {
-				await app.fileManager.renameFile(file, targetPath)
-				console.log("Moved file to: " + targetPath);
-			})(this.currentFile, targetPath)
-			
-		}
+		const originalFolder = this.currentFile.parent;
 
-		// find the next file to open in the folder. 
-		const nextFile = originalFolder.children.find(fileOrFolder => fileOrFolder instanceof TFile)
-		const newLeaf = app.workspace.getLeaf();
-		newLeaf.openFile(nextFile)
+		const specifiedFolderPath = this.showingNoSuggestions ? this.inputEl.value : folder.path;
+
+		// Make sure the selected folder exists
+		(async () => {
+			const targetFolder = await app.vault.getAbstractFileByPath(specifiedFolderPath);
+			if (targetFolder === null) {
+				console.log(`${specifiedFolderPath} does not exist. Creating now...`);
+				await app.vault.createFolder(specifiedFolderPath);
+			}
+			const newFilePath = specifiedFolderPath + "/" + this.currentFile.name;
+			console.log(`Moving ${this.currentFile.path} to ${newFilePath}`);
+			await app.fileManager.renameFile(this.currentFile, newFilePath)
+			
+			if (this.autoProceedToNextFile) {
+				const isAFile = (thing: TAbstractFile): thing is TFile => {
+					return thing instanceof TFile;
+				};
+
+				const nextFile : TFile[] = originalFolder.children.filter(isAFile)
+				
+				if (nextFile.length > 0) {
+					const newLeaf = app.workspace.getLeaf();
+					const toOpen = nextFile[0];
+					await newLeaf.openFile(toOpen)
+				} else {
+					new Notice("Folder now empty.")
+				}
+			}
+		})()
+
 		this.close();
 	}
 
@@ -167,9 +179,9 @@ export class TargetFolderModal extends SuggestModal<TFolder> {
 }
 
 class MoveToNewOrExistingFolderSettingsTab extends PluginSettingTab {
-	plugin: BetterMoverPlugin;
+	plugin: FileChuckerPlugin;
 
-	constructor(app: App, plugin: BetterMoverPlugin) {
+	constructor(app: App, plugin: FileChuckerPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -188,9 +200,9 @@ class MoveToNewOrExistingFolderSettingsTab extends PluginSettingTab {
 			.setDesc("Allows you to process a folder like an Inbox quickly.")
 			.addToggle((setting) => {
 				setting
-				.setValue(this.plugin.settings.openNextFileInFolder)
+				.setValue(this.plugin.settings.proceedToNextFileInFolder)
 				.onChange(async (value) => {
-					this.plugin.settings.openNextFileInFolder = value;
+					this.plugin.settings.proceedToNextFileInFolder = value;
 					await this.plugin.saveSettings();
 				})
 			});
