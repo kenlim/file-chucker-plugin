@@ -41,7 +41,7 @@ export default class FileChuckerPlugin extends Plugin {
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new MoveToNewOrExistingFolderSettingsTab(this.app, this));
+		this.addSettingTab(new FileChuckerSettingsTab(this.app, this));
 
 	}
 
@@ -193,7 +193,7 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 	}
 }
 
-class MoveToNewOrExistingFolderSettingsTab extends PluginSettingTab {
+class FileChuckerSettingsTab extends PluginSettingTab {
 	plugin: FileChuckerPlugin;
 
 	constructor(app: App, plugin: FileChuckerPlugin) {

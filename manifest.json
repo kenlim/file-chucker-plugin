@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-file-chucker",
 	"name": "File Chucker",
-	"version": "0.0.1",
+	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Quickly move a file to a new or existing folder, then open the next file.",
 	"author": "Ken Lim",
