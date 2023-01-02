@@ -34,7 +34,16 @@ export default class FileChuckerPlugin extends Plugin {
 		this.addCommand({
 			id: "move-to-new-or-existing-folder",
 			name: "Move to new or existing folder",
-			editorCallback: (editor: Editor, view: MarkdownView) => {
+			checkCallback: (checking) => {
+				if (checking) {
+					// make sure the active view is a MarkdownView.
+					return !!this.app.workspace.getActiveViewOfType(
+						MarkdownView
+					);
+				}
+				let view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (!view || !(view instanceof MarkdownView)) return;
+
 				const currentFile = view.file;
 				new FileChuckerModal(
 					this.app,
@@ -154,9 +163,9 @@ export class FileChuckerModal extends SuggestModal<TFolder> {
 
 		// Make sure the selected folder exists
 		(async () => {
-			const targetFolder = await app.vault.getAbstractFileByPath(
-				specifiedFolderPath
-			);
+			const targetFolder =
+				app.vault.getAbstractFileByPath(specifiedFolderPath);
+
 			if (targetFolder === null) {
 				if (this.settings.debugMode) {
 					console.log(
