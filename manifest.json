@@ -1,7 +1,7 @@
 {
 	"id": "file-chucker",
 	"name": "File Chucker",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "1.0.3",
 	"description": "Quickly move a file to a new or existing folder, then open the next file.",
 	"author": "Ken Lim",
