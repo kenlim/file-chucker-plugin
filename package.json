@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-file-chucker",
+	"name": "file-chucker",
 	"version": "1.0.0",
 	"description": "Plugin that allows you to move a file to a new or existing folder.",
 	"main": "main.js",
